@@ -18,85 +18,145 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ BASIC ROUTES
-app.get('/', (req, res) => {
-  res.send('🚀 Portfolio Backend - Pak Classified - Running Successfully!');
-});
-
-app.get('/env-check', (req, res) => {
-    const envVars = {
-        CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
-        CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? "✅ SET" : "❌ MISSING",
-        CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? "✅ SET" : "❌ MISSING", 
-        MONGODB_URI: process.env.MONGODB_URI ? "✅ SET" : "❌ MISSING",
-        NODE_ENV: process.env.NODE_ENV || 'development'
-    };
-    res.json(envVars);
-});
-
-app.get('/health', async (req, res) => {
-    try {
-        const dbStatus = mongoose.connection.readyState;
-        const status = {
-            0: 'Disconnected',
-            1: 'Connected', 
-            2: 'Connecting',
-            3: 'Disconnecting'
-        };
-        
-        res.json({
-            server: 'Running ✅',
-            database: status[dbStatus],
-            databaseHost: mongoose.connection.host || 'Not connected',
-            databaseName: mongoose.connection.name || 'Not connected',
-            timestamp: new Date()
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ✅ DATABASE CONNECTION - FIXED FOR LATEST MONGODB
+// ✅ DATABASE CONNECTION - OPTIMIZED FOR VERCEL SERVERLESS
 const connectDB = async () => {
   try {
-    console.log('🚀 INITIATING MONGODB CONNECTION...');
+    // Check if already connected
+    if (mongoose.connection.readyState === 1) {
+      console.log('✅ MongoDB already connected');
+      return mongoose.connection;
+    }
+
+    console.log('🚀 INITIATING MONGODB CONNECTION FOR VERCEL...');
     
     if (!process.env.MONGODB_URI) {
       console.log('❌ MONGODB_URI NOT FOUND');
       return;
     }
 
-    console.log('📍 MONGODB_URI FOUND, CONNECTING...');
-
-    // ✅ UPDATED OPTIONS - REMOVED DEPRECATED SETTINGS
+    // ✅ VERCEL OPTIMIZED SETTINGS
     const options = {
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 15000,
+      maxPoolSize: 5,
+      minPoolSize: 1,
       retryWrites: true,
-      retryReads: true
+      retryReads: true,
     };
 
     await mongoose.connect(process.env.MONGODB_URI, options);
     
-    console.log('✅ MONGODB CONNECTED SUCCESSFULLY!');
+    console.log('✅ MONGODB CONNECTED SUCCESSFULLY ON VERCEL!');
     console.log('🏠 Host:', mongoose.connection.host);
     console.log('🗃️ Database:', mongoose.connection.name);
-    console.log('📊 Ready State:', mongoose.connection.readyState);
     
+    return mongoose.connection;
   } catch (error) {
-    console.error('💥 MONGODB CONNECTION FAILED:', error.message);
-    
-    // Retry connection after 5 seconds
-    setTimeout(() => {
-      console.log('🔄 RETRYING MONGODB CONNECTION...');
-      connectDB();
-    }, 5000);
+    console.error('💥 MONGODB CONNECTION FAILED ON VERCEL:', error.message);
+    return null;
   }
 };
 
-// Database connect karo
+// Connect on server start
 connectDB();
+
+// ✅ COLD START HANDLER - Reconnect on every request
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    console.log('🔄 Cold start detected, reconnecting to MongoDB...');
+    await connectDB();
+  }
+  next();
+});
+
+// ✅ BASIC ROUTES
+app.get('/', (req, res) => {
+  res.send('🚀 Portfolio Backend - Pak Classified - Running Successfully on Vercel!');
+});
+
+app.get('/env-check', (req, res) => {
+  const envVars = {
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? "✅ SET" : "❌ MISSING",
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? "✅ SET" : "❌ MISSING", 
+    MONGODB_URI: process.env.MONGODB_URI ? "✅ SET" : "❌ MISSING",
+    NODE_ENV: process.env.NODE_ENV || 'development'
+  };
+  res.json(envVars);
+});
+
+app.get('/health', async (req, res) => {
+  try {
+    const dbStatus = mongoose.connection.readyState;
+    const status = {
+      0: 'Disconnected',
+      1: 'Connected', 
+      2: 'Connecting',
+      3: 'Disconnecting'
+    };
+    
+    // Force actual connection test
+    let isActuallyConnected = false;
+    let pingResult = 'Not tested';
+    
+    if (dbStatus === 1) {
+      try {
+        pingResult = await mongoose.connection.db.admin().ping();
+        isActuallyConnected = true;
+      } catch (pingError) {
+        isActuallyConnected = false;
+        pingResult = `Ping failed: ${pingError.message}`;
+      }
+    }
+    
+    res.json({
+      server: 'Running ✅',
+      database: isActuallyConnected ? 'Connected ✅' : status[dbStatus],
+      databaseHost: mongoose.connection.host || 'Not connected',
+      databaseName: mongoose.connection.name || 'Not connected',
+      readyState: dbStatus,
+      pingTest: pingResult,
+      timestamp: new Date(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ DEMO ROUTE FOR PORTFOLIO
+app.get('/demo-data', (req, res) => {
+  res.json({
+    message: "🚀 Pak Classified - Full Stack MERN Application",
+    features: [
+      "User Authentication & Authorization",
+      "Advertisement CRUD Operations", 
+      "Image Upload with Cloudinary",
+      "Category & Location Management",
+      "Advanced Search & Filters",
+      "Responsive React Frontend",
+      "Node.js + Express Backend",
+      "MongoDB Database",
+      "JWT Token Security"
+    ],
+    status: "Backend API Fully Operational",
+    database: mongoose.connection.readyState === 1 ? "Connected ✅" : "Connecting...",
+    timestamp: new Date()
+  });
+});
+
+// ✅ MONGODB EVENT LISTENERS
+mongoose.connection.on('connected', () => {
+  console.log('🎯 Mongoose connected to MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.log('❌ Mongoose connection error:', err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ Mongoose disconnected from MongoDB');
+});
 
 // ✅ ROUTES
 const createCategory = require("./routes/category");
@@ -113,8 +173,11 @@ app.use("/createlogin", loginROUTER);
 
 // ✅ ERROR HANDLERS
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('💥 Server Error:', err.stack);
+  res.status(500).json({ 
+    error: 'Something went wrong!',
+    message: err.message 
+  });
 });
 
 app.use((req, res) => {
