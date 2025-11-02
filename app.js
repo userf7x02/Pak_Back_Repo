@@ -78,6 +78,41 @@ app.get('/health', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// ✅ TEST DATABASE ROUTE
+app.get('/test-db', async (req, res) => {
+  try {
+    const dbStatus = mongoose.connection.readyState;
+    const statusMap = {
+      0: 'Disconnected',
+      1: 'Connected', 
+      2: 'Connecting',
+      3: 'Disconnecting'
+    };
+    
+    // Test database operation
+    let testResult = 'Not tested';
+    if (dbStatus === 1) {
+      const mongoose = require('mongoose');
+      testResult = await mongoose.connection.db.admin().ping();
+    }
+    
+    res.json({
+      database: statusMap[dbStatus],
+      connectionState: dbStatus,
+      mongodbUri: process.env.MONGODB_URI ? '✅ Present' : '❌ Missing',
+      databaseTest: testResult,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    res.json({
+      database: 'Error',
+      connectionState: 0,
+      mongodbUri: process.env.MONGODB_URI ? '✅ Present' : '❌ Missing',
+      databaseTest: error.message,
+      timestamp: new Date()
+    });
+  }
+});
 
 // ✅ MULTER SETUP
 const multer = require("multer");
@@ -97,14 +132,35 @@ if (!fs.existsSync('uploads')) {
 
 const upload = multer({ storage });
 
-// ✅ DATABASE CONNECT
-const connecting = require("./common/connect");
-connecting().then(() => {
-  console.log("✅ Database connection attempted");
-}).catch(err => {
-  console.log("❌ Database connection failed:", err.message);
-});
+// ✅ DATABASE CONNECTION WITH PROPER ERROR HANDLING
+const connectDB = async () => {
+  try {
+    console.log('📍 Connecting to MongoDB...');
+    console.log('📍 MongoDB URI Present:', process.env.MONGODB_URI ? '✅ YES' : '❌ NO');
+    
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is missing');
+    }
 
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+    });
+    
+    console.log('✅ MongoDB Connected Successfully');
+    console.log('📍 Host:', mongoose.connection.host);
+    console.log('📍 Database:', mongoose.connection.name);
+    
+  } catch (error) {
+    console.error('❌ MongoDB Connection Error:', error.message);
+    // Process exit mat karo, server chalne do
+  }
+};
+
+// Database connect karo
+connectDB();
 // ✅ IMPORTED ROUTES
 const createCategory = require("./routes/category");
 const createStatus = require("./routes/status");
