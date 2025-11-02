@@ -56,23 +56,42 @@ app.get('/health', async (req, res) => {
     }
 });
 
-// ✅ DATABASE CONNECTION
+// ✅ DATABASE CONNECTION - FIXED FOR LATEST MONGODB
 const connectDB = async () => {
   try {
-    console.log('📍 Connecting to MongoDB...');
+    console.log('🚀 INITIATING MONGODB CONNECTION...');
     
     if (!process.env.MONGODB_URI) {
-      console.log('❌ MONGODB_URI missing');
+      console.log('❌ MONGODB_URI NOT FOUND');
       return;
     }
 
-    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('📍 MONGODB_URI FOUND, CONNECTING...');
+
+    // ✅ UPDATED OPTIONS - REMOVED DEPRECATED SETTINGS
+    const options = {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      retryWrites: true,
+      retryReads: true
+    };
+
+    await mongoose.connect(process.env.MONGODB_URI, options);
     
-    console.log('✅ MongoDB Connected');
-    console.log('📍 Database:', mongoose.connection.name);
+    console.log('✅ MONGODB CONNECTED SUCCESSFULLY!');
+    console.log('🏠 Host:', mongoose.connection.host);
+    console.log('🗃️ Database:', mongoose.connection.name);
+    console.log('📊 Ready State:', mongoose.connection.readyState);
     
   } catch (error) {
-    console.error('❌ MongoDB Error:', error.message);
+    console.error('💥 MONGODB CONNECTION FAILED:', error.message);
+    
+    // Retry connection after 5 seconds
+    setTimeout(() => {
+      console.log('🔄 RETRYING MONGODB CONNECTION...');
+      connectDB();
+    }, 5000);
   }
 };
 
